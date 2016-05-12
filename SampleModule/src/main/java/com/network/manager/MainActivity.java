@@ -26,6 +26,7 @@ public class MainActivity extends AppCompatActivity {
             public void run() {
                 NetworkManager networkManager = new NetworkManager(MainActivity.this, true);
                 networkManager.init("Błąd połączenia...", 5000);
+
                 networkManager.setDialog("Logowanie...", ProgressDialog.STYLE_SPINNER);
                 networkManager.addRequest(new InitRequestCreator());
                 networkManager.setNetworkManagerCallbacks(new NetworkManagerCallbacks() {
