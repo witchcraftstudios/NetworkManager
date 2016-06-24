@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">NetworkManager</string>
     <string name="error_message">Connection error…</string>
+    <string name="application_name">NetworkManager</string>
 </resources>

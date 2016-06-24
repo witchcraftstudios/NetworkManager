@@ -2,7 +2,6 @@ package com.network.manager;
 
 import android.app.ProgressDialog;
 import android.os.Bundle;
-import android.os.Handler;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
@@ -20,36 +19,36 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onStartClick(View view) {
-        Handler handler = new Handler(getMainLooper());
-        handler.postDelayed(new Runnable() {
+        NetworkManager networkManager = new NetworkManager(MainActivity.this, true);
+        networkManager.init("Błąd połączenia...", 1000);
+        networkManager.setDialog("Logowanie...", ProgressDialog.STYLE_SPINNER);
+        networkManager.addRequest(new InitRequestCreator());
+        networkManager.addRequest(new InitRequestCreator());
+        networkManager.addRequest(new InitRequestCreator());
+        networkManager.addRequest(new InitRequestCreator());
+        networkManager.addRequest(new InitRequestCreator());
+        networkManager.addRequest(new InitRequestCreator());
+        networkManager.addRequest(new InitRequestCreator());
+        networkManager.setNetworkManagerCallbacks(new NetworkManagerCallbacks() {
             @Override
-            public void run() {
-                NetworkManager networkManager = new NetworkManager(MainActivity.this, true);
-                networkManager.init("Błąd połączenia...", 5000);
-
-                networkManager.setDialog("Logowanie...", ProgressDialog.STYLE_SPINNER);
-                networkManager.addRequest(new InitRequestCreator());
-                networkManager.setNetworkManagerCallbacks(new NetworkManagerCallbacks() {
-                    @Override
-                    public void onStart() throws Exception {
-                    }
-
-                    @Override
-                    public void onError(String error) {
-                        Log.e(TAG, error);
-                    }
-
-                    @Override
-                    public void onSuccess() {
-                        Log.e(TAG, "onSuccess");
-                    }
-
-                    @Override
-                    public void onCancelled() throws Exception {
-                    }
-                });
-                networkManager.execute();
+            public void onStart() throws Exception {
             }
-        }, 3000);
+
+            @Override
+            public void onError(String error) {
+                Log.e(TAG, error);
+            }
+
+            @Override
+            public void onSuccess() {
+                Log.e(TAG, "onSuccess");
+            }
+
+            @Override
+            public void onCancelled() throws Exception {
+                Log.e(TAG, "onCancelled");
+            }
+        });
+        networkManager.execute();
     }
 }

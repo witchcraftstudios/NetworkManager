@@ -6,6 +6,7 @@ public class MultipartRequestParams {
 
     private final HashMap<String, Object> fileParams = new HashMap<>();
 
+    @SuppressWarnings("unused")
     public void put(String key, Object value) {
         fileParams.put(key, value);
     }

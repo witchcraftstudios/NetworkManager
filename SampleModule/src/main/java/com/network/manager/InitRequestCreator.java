@@ -1,15 +1,19 @@
 package com.network.manager;
 
+import android.os.Environment;
+
 import com.network.library.MultipartRequestParams;
 import com.network.library.RequestCreator;
 import com.network.library.RequestHeaders;
 import com.network.library.RequestParams;
 
+import java.io.InputStream;
+
 public class InitRequestCreator extends RequestCreator<InitModel> {
 
     @Override
     public String onCreateUrl() {
-        return "http://mraport.witchcraftstudios.com/api/init.json";
+        return "https://katalogrozwiazan.pl/pl/solution/217_drugs-analytics.pdf";
     }
 
     @Override
@@ -38,7 +42,9 @@ public class InitRequestCreator extends RequestCreator<InitModel> {
     }
 
     @Override
-    public InitModel onDownloadSuccess(String response) throws Exception {
+    public InitModel onDownloadSuccess(InputStream inputStream) throws Exception {
+        String filePath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getAbsolutePath();
+        getNetworkManager().convertInputStreamToFile(inputStream, filePath, "test.pdf");
         return new InitModel();
     }
 

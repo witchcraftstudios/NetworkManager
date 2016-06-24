@@ -5,6 +5,8 @@ import android.app.Application;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Handler;
@@ -17,7 +19,7 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -31,12 +33,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-public class NetworkManager extends AsyncTask<String, String, Boolean> {
+public class NetworkManager extends AsyncTask<String, Integer, Boolean> {
     private static final String TAG = "NetworkManager";
     private static final String CHARSET = "UTF-8";
 
     private WeakReference<Context> contextWeakReference = new WeakReference<>(null);
-    private List<RequestCreator> requestCreatorList = new ArrayList<>();
+    private final List<RequestCreator> requestCreatorList = new ArrayList<>();
     private NetworkManagerCallbacks networkManagerCallbacks = null;
     private HttpURLConnection httpURLConnection;
 
@@ -96,13 +98,14 @@ public class NetworkManager extends AsyncTask<String, String, Boolean> {
                 }
 
                 if (this.cancelOnDestroy && context instanceof Activity) {
-                    if (!isActivityRunning()) {
+                    if (isActivityRunning()) {
                         return false;
                     }
                 }
 
                 RequestCreator requestCreator = this.requestCreatorList.get(i);
                 onCreateRequest(requestCreator);
+                publishProgress(i + 1);
             }
             return true;
         } catch (Exception e) {
@@ -112,17 +115,14 @@ public class NetworkManager extends AsyncTask<String, String, Boolean> {
     }
 
     @Override
-    protected void onCancelled() {
-        super.onCancelled();
-        try {
-            if (httpURLConnection != null) {
-                httpURLConnection.disconnect();
-                httpURLConnection = null;
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        onDismissDialog();
+    protected void onProgressUpdate(Integer... values) {
+        super.onProgressUpdate(values);
+        onUpdateProgress(values[0], requestCreatorList.size());
+    }
+
+    @SuppressWarnings({"EmptyMethod", "UnusedParameters", "WeakerAccess"})
+    protected void onUpdateProgress(int progress, int size) {
+
     }
 
     @Override
@@ -133,7 +133,7 @@ public class NetworkManager extends AsyncTask<String, String, Boolean> {
                 return;
             }
 
-            if (context instanceof Activity && !isActivityRunning()) {
+            if (context instanceof Activity && isActivityRunning()) {
                 return;
             }
 
@@ -189,16 +189,14 @@ public class NetworkManager extends AsyncTask<String, String, Boolean> {
                 break;
             }
 
-            String response = onHttpConnect(requestUrl, params, requestMethod, requestHeaders, multipartRequestParams);
-            if (response != null) {
-                Log.e(TAG, response);
-
+            InputStream inputStream = onHttpConnect(requestUrl, params, requestMethod, requestHeaders, multipartRequestParams);
+            if (inputStream != null) {
                 Context context = this.contextWeakReference.get();
                 if (context == null) {
                     return;
                 }
 
-                final Object result = requestCreator.onDownloadSuccess(response);
+                final Object result = requestCreator.onDownloadSuccess(inputStream);
                 Handler handler = new Handler(context.getMainLooper());
                 Runnable runnable = new Runnable() {
                     @Override
@@ -214,25 +212,24 @@ public class NetworkManager extends AsyncTask<String, String, Boolean> {
                     }
                 };
                 handler.post(runnable);
+                inputStream.close();
                 break;
             }
 
-            if (i == 0) {
-                throw new Exception("RETRY == 0");
-            }
-
             if (!isCancelled()) {
+                if (i == 0) {
+                    throw new Exception("RETRY == 0");
+                }
+
                 Log.e(TAG, "******RETRY COUNT: " + (i - 1) + "*******");
                 Thread.sleep(1000);
             }
         }
     }
 
-    protected String onHttpConnect(String requestUrl, String params, String requestMethod, RequestHeaders requestHeaders,
-                                   MultipartRequestParams multipartRequestParams) {
-        InputStream inputStream = null;
-        String response;
-
+    private InputStream onHttpConnect(String requestUrl, String params, String requestMethod,
+                                      RequestHeaders requestHeaders, MultipartRequestParams multipartRequestParams) {
+        InputStream inputStream;
         try {
             Log.w(TAG, "REQUEST_URL: " + requestUrl);
             Log.w(TAG, "REQUEST_PARAMS: " + params);
@@ -354,27 +351,18 @@ public class NetworkManager extends AsyncTask<String, String, Boolean> {
 
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 inputStream = httpURLConnection.getInputStream();
-                response = onHttpConnectionResult(inputStream);
             } else {
                 inputStream = httpURLConnection.getErrorStream();
-                response = onHttpConnectionResult(inputStream);
             }
         } catch (Exception e) {
             e.printStackTrace();
             return null;
-        } finally {
-            if (inputStream != null) {
-                try {
-                    inputStream.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
         }
-        return response;
+        return inputStream;
     }
 
-    protected String onHttpConnectionResult(InputStream inputStream) throws Exception {
+    @SuppressWarnings("unused")
+    public String convertInputStreamToString(InputStream inputStream) throws Exception {
         BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
         StringBuilder stringBuilder = new StringBuilder();
         String line;
@@ -387,10 +375,33 @@ public class NetworkManager extends AsyncTask<String, String, Boolean> {
         return stringBuilder.toString();
     }
 
+    @SuppressWarnings({"unused", "TryFinallyCanBeTryWithResources"})
+    public void convertInputStreamToFile(InputStream inputStream, String filePath, String fileName) throws Exception {
+        File file = new File(filePath, fileName);
+        OutputStream outputStream = new FileOutputStream(file);
+
+        long startTimeMillis = System.currentTimeMillis();
+
+        try {
+            byte[] buffer = new byte[1024];
+            int read;
+            while ((read = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, read);
+            }
+            outputStream.flush();
+        } finally {
+            outputStream.close();
+        }
+
+        long endTimeMillis = System.currentTimeMillis();
+        Log.e("Czas zapisywania pliku:", "" + (endTimeMillis - startTimeMillis) + "ms");
+    }
+
     public void setErrorMassage(String errorMassage) {
         this.errorMassage = errorMassage;
     }
 
+    @SuppressWarnings("WeakerAccess")
     public void setDelay(int delay) {
         this.delay = delay;
     }
@@ -407,6 +418,7 @@ public class NetworkManager extends AsyncTask<String, String, Boolean> {
         this.networkManagerCallbacks = networkManagerCallbacks;
     }
 
+    @SuppressWarnings("WeakerAccess")
     public String getErrorMassage() {
         return this.errorMassage;
     }
@@ -422,7 +434,7 @@ public class NetworkManager extends AsyncTask<String, String, Boolean> {
                 return;
             }
 
-            if (!isActivityRunning()) {
+            if (isActivityRunning()) {
                 return;
             }
 
@@ -441,7 +453,8 @@ public class NetworkManager extends AsyncTask<String, String, Boolean> {
                 public boolean onKey(DialogInterface dialog, int keyCode, KeyEvent event) {
                     if (keyCode == KeyEvent.KEYCODE_BACK && !onKeyPressed) {
                         this.onKeyPressed = true;
-                        cancel(true);
+                        onDismissDialog();
+                        cancelRequests();
                     }
                     return true;
                 }
@@ -474,13 +487,34 @@ public class NetworkManager extends AsyncTask<String, String, Boolean> {
         cancel(true);
     }
 
+    @Override
+    protected void onCancelled() {
+        super.onCancelled();
+        try {
+            if (httpURLConnection != null) {
+                httpURLConnection.disconnect();
+                httpURLConnection = null;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        onDismissDialog();
+    }
+
     @SuppressWarnings("unused")
     public boolean isFinished() {
         return getStatus() == Status.FINISHED;
     }
 
+    @SuppressWarnings("unused")
+    public static boolean isInternetConnection(Context context) {
+        ConnectivityManager connectivityManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
+        return networkInfo != null && networkInfo.isConnectedOrConnecting();
+    }
+
     private boolean isActivityRunning() {
         Context context = this.contextWeakReference.get();
-        return context != null && !((Activity) context).isFinishing();
+        return !(context == null || ((Activity) context).isFinishing());
     }
 }

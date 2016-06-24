@@ -2,6 +2,8 @@ package com.network.library;
 
 import android.content.Context;
 
+import java.io.InputStream;
+
 public abstract class RequestCreator<T> {
 
     private NetworkManager networkManager;
@@ -18,7 +20,7 @@ public abstract class RequestCreator<T> {
 
     public abstract String onCreateRequestMethod();
 
-    public abstract T onDownloadSuccess(String response) throws Exception;
+    public abstract T onDownloadSuccess(InputStream inputStream) throws Exception;
 
     public abstract void onResult(T result) throws Exception;
 
@@ -37,7 +39,7 @@ public abstract class RequestCreator<T> {
     }
 
     @SuppressWarnings("unused")
-    public Context getContext(){
+    public Context getContext() {
         return getNetworkManager().getContext();
     }
 
