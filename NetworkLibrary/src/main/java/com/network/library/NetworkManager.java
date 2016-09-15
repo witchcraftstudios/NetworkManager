@@ -97,8 +97,12 @@ public class NetworkManager extends AsyncTask<String, Integer, Boolean> {
                     return false;
                 }
 
+                if (!isInternetConnection(context)) {
+                    throw new Exception();
+                }
+
                 if (this.cancelOnDestroy && context instanceof Activity) {
-                    if (isActivityRunning()) {
+                    if (!isActivityRunning()) {
                         return false;
                     }
                 }
@@ -133,7 +137,7 @@ public class NetworkManager extends AsyncTask<String, Integer, Boolean> {
                 return;
             }
 
-            if (context instanceof Activity && isActivityRunning()) {
+            if (context instanceof Activity && !isActivityRunning()) {
                 return;
             }
 
@@ -434,7 +438,7 @@ public class NetworkManager extends AsyncTask<String, Integer, Boolean> {
                 return;
             }
 
-            if (isActivityRunning()) {
+            if (!isActivityRunning()) {
                 return;
             }
 
@@ -506,15 +510,14 @@ public class NetworkManager extends AsyncTask<String, Integer, Boolean> {
         return getStatus() == Status.FINISHED;
     }
 
-    @SuppressWarnings("unused")
     public static boolean isInternetConnection(Context context) {
-        ConnectivityManager connectivityManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        ConnectivityManager connectivityManager = (ConnectivityManager) context.getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
         return networkInfo != null && networkInfo.isConnectedOrConnecting();
     }
 
     private boolean isActivityRunning() {
         Context context = this.contextWeakReference.get();
-        return !(context == null || ((Activity) context).isFinishing());
+        return context != null && !((Activity) context).isFinishing();
     }
 }
