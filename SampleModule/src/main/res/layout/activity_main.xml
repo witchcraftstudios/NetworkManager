@@ -1,14 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    tools:context="com.network.manager.MainActivity">
+    android:layout_height="match_parent">
+
+    <Button
+        android:layout_alignParentRight="true"
+        android:id="@+id/button2"
+        android:onClick="onNextClick"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="NEXT" />
 
     <Button
         android:id="@+id/button"
         android:onClick="onStartClick"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Start" />
+        android:text="Start"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true" />
 </RelativeLayout>

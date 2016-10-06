@@ -1,54 +1,118 @@
 package com.network.manager;
 
-import android.app.ProgressDialog;
+import android.Manifest;
+import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Environment;
+import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 
 import com.network.library.NetworkManager;
 import com.network.library.NetworkManagerCallbacks;
+import com.network.library.RequestCallback;
 
 public class MainActivity extends AppCompatActivity {
+    public static final int PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE = 1;
     public static final String TAG = "MainActivity";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        this.setContentView(R.layout.activity_main);
     }
 
     public void onStartClick(View view) {
-        NetworkManager networkManager = new NetworkManager(MainActivity.this, true);
-        networkManager.init("Błąd połączenia...", 1000);
-        networkManager.setDialog("Logowanie...", ProgressDialog.STYLE_SPINNER);
-        networkManager.addRequest(new InitRequestCreator());
-        networkManager.addRequest(new InitRequestCreator());
-        networkManager.addRequest(new InitRequestCreator());
-        networkManager.addRequest(new InitRequestCreator());
-        networkManager.addRequest(new InitRequestCreator());
-        networkManager.addRequest(new InitRequestCreator());
-        networkManager.addRequest(new InitRequestCreator());
-        networkManager.setNetworkManagerCallbacks(new NetworkManagerCallbacks() {
-            @Override
-            public void onStart() throws Exception {
-            }
+        if (onCheckPermissions()) {
+            NetworkManager mNetworkManager = new NetworkManager(MainActivity.this, true);
+            mNetworkManager.init("Błąd połączenia...", 1000);
 
-            @Override
-            public void onError(String error) {
-                Log.e(TAG, error);
-            }
+            SetupRequestCreator mSetupRequestCreator = new SetupRequestCreator();
+            mSetupRequestCreator.setRequestCallback(this.mRequestCallback);
 
-            @Override
-            public void onSuccess() {
-                Log.e(TAG, "onSuccess");
-            }
+            mNetworkManager.addRequest(mSetupRequestCreator);
+            mNetworkManager.setNetworkManagerCallbacks(this.mNetworkManagerCallbacks);
+            mNetworkManager.execute();
+        }
+    }
 
-            @Override
-            public void onCancelled() throws Exception {
-                Log.e(TAG, "onCancelled");
+    public boolean onCheckPermissions() {
+        final String state = Environment.getExternalStorageState();
+        if (!Environment.MEDIA_MOUNTED.equals(state)) {
+            Log.e(TAG, "Error: External storage is unavailable");
+            return false;
+        }
+        if (Environment.MEDIA_MOUNTED_READ_ONLY.equals(state)) {
+            Log.e(TAG, "Error: External storage is read only.");
+            return false;
+        }
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            Log.e(TAG, "permission: WRITE_EXTERNAL_STORAGE: NOT granted!");
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE);
+            return false;
+        }
+
+        return true;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[], @NonNull int[] grantResults) {
+        switch (requestCode) {
+            case PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE: {
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+
+                } else {
+
+                }
             }
-        });
-        networkManager.execute();
+        }
+    }
+
+
+    private final RequestCallback<InitModel> mRequestCallback = new RequestCallback<InitModel>() {
+
+        @Override
+        public void onSuccess(InitModel pResult) throws Exception {
+            Log.e(TAG, "RequestCallback: " + "onSuccess");
+        }
+
+        @Override
+        public void onError(String pError) {
+            Log.e(TAG, "RequestCallback: " + "onError: " + pError);
+        }
+    };
+
+
+    private final NetworkManagerCallbacks mNetworkManagerCallbacks = new NetworkManagerCallbacks() {
+        @Override
+        public void onStart() throws Exception {
+            Log.e(TAG, "onStart");
+        }
+
+        @Override
+        public void onError(String error) {
+            Log.e(TAG, error);
+        }
+
+        @Override
+        public void onSuccess() {
+            Log.e(TAG, "onSuccess");
+        }
+
+        @Override
+        public void onCancelled() throws Exception {
+            Log.e(TAG, "onCancelled");
+        }
+    };
+
+    public void onNextClick(View view) {
+        finish();
+        Intent mIntent = new Intent(this, TestActivity.class);
+        startActivity(mIntent);
     }
 }

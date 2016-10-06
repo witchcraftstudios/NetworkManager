@@ -1,19 +1,23 @@
 package com.network.manager;
 
 import android.os.Environment;
+import android.util.Log;
 
 import com.network.library.MultipartRequestParams;
 import com.network.library.RequestCreator;
 import com.network.library.RequestHeaders;
 import com.network.library.RequestParams;
 
+import java.io.File;
 import java.io.InputStream;
 
-public class InitRequestCreator extends RequestCreator<InitModel> {
+import static com.network.manager.TestActivity.TAG;
+
+public class SetupRequestCreator extends RequestCreator<InitModel> {
 
     @Override
     public String onCreateUrl() {
-        return "https://katalogrozwiazan.pl/pl/solution/217_drugs-analytics.pdf";
+        return "http://app.witchcraftstudios.com/finspi/finspi/NaviSail-Files.zip";
     }
 
     @Override
@@ -43,8 +47,14 @@ public class InitRequestCreator extends RequestCreator<InitModel> {
 
     @Override
     public InitModel onDownloadSuccess(InputStream inputStream) throws Exception {
-        String filePath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getAbsolutePath();
-        getNetworkManager().convertInputStreamToFile(inputStream, filePath, "test.pdf");
+        final File storagePublicDirectory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS + "/NetworkManager/");
+        if (!storagePublicDirectory.exists()) {
+            final boolean success = storagePublicDirectory.mkdirs();
+            Log.e(TAG, "createFolder: " + success);
+        }
+
+
+        getNetworkManager().convertInputStreamToFile(inputStream, storagePublicDirectory.getAbsolutePath(), "test.zip");
         return new InitModel();
     }
 

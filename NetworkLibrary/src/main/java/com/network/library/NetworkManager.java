@@ -9,10 +9,12 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Handler;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.view.Window;
 import android.view.WindowManager;
 
 import java.io.BufferedReader;
@@ -36,80 +38,87 @@ import java.util.List;
 public class NetworkManager extends AsyncTask<String, Integer, Boolean> {
     private static final String TAG = "NetworkManager";
     private static final String CHARSET = "UTF-8";
+    private static final String CRLF = "\r\n";
 
-    private WeakReference<Context> contextWeakReference = new WeakReference<>(null);
     private final List<RequestCreator> requestCreatorList = new ArrayList<>();
-    private NetworkManagerCallbacks networkManagerCallbacks = null;
-    private HttpURLConnection httpURLConnection;
+    private final boolean mCancelOnDestroy;
 
-    private ProgressDialog progressDialog;
+    private WeakReference<Context> mContextWeakReference = new WeakReference<>(null);
+    private NetworkManagerCallbacks mNetworkManagerCallbacks = null;
+    private HttpURLConnection mHttpURLConnection;
 
-    private String errorMassage = "Connection error...";
-    private String dialogTitle;
+    private ProgressDialog mProgressDialog;
+    private RequestCreator mCurrentRequest;
 
-    private int dialogTheme = ProgressDialog.STYLE_SPINNER;
-    private int delay = 0;
+    private String mErrorMassage = "Connection error...";
+    private String mDialogTitle;
 
-    private boolean cancelOnDestroy = true;
-    private boolean showDialog = false;
+    private int mDialogTheme = ProgressDialog.STYLE_SPINNER;
+    private int mDelay = 0;
 
-    public NetworkManager(Context context, boolean cancelOnDestroy) {
-        this.contextWeakReference = new WeakReference<>(context);
-        this.cancelOnDestroy = cancelOnDestroy;
+    private boolean mShowDialog = false;
+
+    public NetworkManager(Context pContext, boolean pCancelOnDestroy) {
+        this.mContextWeakReference = new WeakReference<>(pContext);
+        this.mCancelOnDestroy = pCancelOnDestroy;
     }
 
     @SuppressWarnings("unused")
     public void init(String defaultErrorMessage, int delay) {
-        setErrorMassage(defaultErrorMessage);
-        setDelay(delay);
+        this.setErrorMassage(defaultErrorMessage);
+        this.setDelay(delay);
     }
 
     @Override
     protected void onPreExecute() {
-        if (this.networkManagerCallbacks != null) {
+        if (this.mNetworkManagerCallbacks != null) {
             try {
-                this.networkManagerCallbacks.onStart();
+                this.mNetworkManagerCallbacks.onStart();
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }
-        if (this.showDialog) {
-            onCreateProgressDialog();
+        if (this.mShowDialog) {
+            this.onCreateProgressDialog();
         }
     }
 
     @Override
     protected Boolean doInBackground(String... params) {
         try {
-            Thread.sleep(this.delay);
+            Thread.sleep(this.mDelay);
             if (this.requestCreatorList.size() < 1) {
                 Log.e(TAG, "You must have at least one \"RequestCreator\"");
                 return false;
             }
 
             for (int i = 0; i < this.requestCreatorList.size(); i++) {
-                if (isCancelled()) {
+                if (this.isCancelled()) {
                     return false;
                 }
 
-                Context context = this.contextWeakReference.get();
+                final Context context = this.mContextWeakReference.get();
                 if (context == null) {
+                    Log.w(TAG, "doInBackground: context == null");
                     return false;
                 }
 
-                if (!isInternetConnection(context)) {
+                if (!NetworkManager.isInternetConnection(context)) {
                     throw new Exception();
                 }
 
-                if (this.cancelOnDestroy && context instanceof Activity) {
+                /*
+                * Cancel on destroy
+                * */
+                if (this.mCancelOnDestroy && context instanceof Activity) {
                     if (!isActivityRunning()) {
                         return false;
                     }
                 }
 
-                RequestCreator requestCreator = this.requestCreatorList.get(i);
-                onCreateRequest(requestCreator);
-                publishProgress(i + 1);
+                final RequestCreator requestCreator = this.requestCreatorList.get(i);
+                this.onCreateRequest(requestCreator);
+                this.publishProgress(i + 1);
             }
             return true;
         } catch (Exception e) {
@@ -121,33 +130,42 @@ public class NetworkManager extends AsyncTask<String, Integer, Boolean> {
     @Override
     protected void onProgressUpdate(Integer... values) {
         super.onProgressUpdate(values);
-        onUpdateProgress(values[0], requestCreatorList.size());
+        if (values.length > 1) {
+            if (this.mCurrentRequest != null)
+                this.onUpdateProgress(values[0], 100, this.mCurrentRequest.getClass().getSimpleName());
+        } else {
+            this.onUpdateProgress(values[0], this.requestCreatorList.size(), TAG);
+        }
     }
 
     @SuppressWarnings({"EmptyMethod", "UnusedParameters", "WeakerAccess"})
-    protected void onUpdateProgress(int progress, int size) {
-
+    protected void onUpdateProgress(int progress, int size, String simpleName) {
+        Log.e(simpleName, "onUpdateProgress: " + progress + "/" + size);
     }
 
     @Override
     protected void onPostExecute(Boolean result) {
         try {
-            Context context = this.contextWeakReference.get();
+            final Context context = this.mContextWeakReference.get();
             if (context == null) {
                 return;
             }
 
-            if (context instanceof Activity && !isActivityRunning()) {
+            if (context instanceof Activity && !this.isActivityRunning()) {
                 return;
             }
 
-            onDismissDialog();
+            this.onDismissDialog();
             if (result) {
-                if (this.networkManagerCallbacks != null)
-                    this.networkManagerCallbacks.onSuccess();
+                if (this.mNetworkManagerCallbacks != null)
+                    this.mNetworkManagerCallbacks.onSuccess();
             } else {
-                if (this.networkManagerCallbacks != null) {
-                    this.networkManagerCallbacks.onError(getErrorMassage());
+                if (this.mNetworkManagerCallbacks != null) {
+                    this.mNetworkManagerCallbacks.onError(this.getErrorMassage());
+                }
+
+                if (this.mCurrentRequest != null) {
+                    this.mCurrentRequest.onError(this.getErrorMassage());
                 }
             }
         } catch (Exception e) {
@@ -162,54 +180,58 @@ public class NetworkManager extends AsyncTask<String, Integer, Boolean> {
 
     @SuppressWarnings("unchecked")
     private void onCreateRequest(final RequestCreator requestCreator) throws Exception {
+        this.setCurrentRequest(requestCreator);
         requestCreator.setNetworkManager(this);
 
         String requestMethod = requestCreator.onCreateRequestMethod();
-        RequestParams requestParams = new RequestParams();
+        final RequestParams requestParams = new RequestParams();
         requestCreator.onCreateRequestParams(requestParams);
 
         int retryCount = requestCreator.onCreateRetryCount();
         retryCount = retryCount < 1 ? 1 : retryCount;
 
         requestMethod = requestMethod == null ? RequestMethod.POST : requestMethod;
-        String requestUrl = requestCreator.onCreateUrl();
-        HashMap<String, String> urlParams = requestParams.getUrlParams();
+        final String requestUrl = requestCreator.onCreateUrl();
+        final HashMap<String, String> urlParams = requestParams.getUrlParams();
 
-        Uri.Builder uriBuilder = new Uri.Builder();
+        final Uri.Builder uriBuilder = new Uri.Builder();
         for (String key : urlParams.keySet()) {
             String value = urlParams.get(key);
             uriBuilder.appendQueryParameter(key, value);
         }
-        String params = uriBuilder.build().getEncodedQuery();
 
-        RequestHeaders requestHeaders = new RequestHeaders();
+        final String params = uriBuilder.build().getEncodedQuery();
+        final RequestHeaders requestHeaders = new RequestHeaders();
         requestCreator.onCreateRequestHeaders(requestHeaders);
 
-        MultipartRequestParams multipartRequestParams = new MultipartRequestParams();
+        final MultipartRequestParams multipartRequestParams = new MultipartRequestParams();
         requestCreator.onCreateMultipartRequestParams(multipartRequestParams);
 
         for (int i = retryCount; i >= 0; i--) {
-            if (isCancelled()) {
+            if (this.isCancelled()) {
                 break;
             }
 
-            InputStream inputStream = onHttpConnect(requestUrl, params, requestMethod, requestHeaders, multipartRequestParams);
+            final InputStream inputStream = onHttpConnect(requestUrl, params, requestMethod, requestHeaders, multipartRequestParams);
             if (inputStream != null) {
-                Context context = this.contextWeakReference.get();
+                final Context context = this.mContextWeakReference.get();
                 if (context == null) {
                     return;
                 }
 
                 final Object result = requestCreator.onDownloadSuccess(inputStream);
-                Handler handler = new Handler(context.getMainLooper());
-                Runnable runnable = new Runnable() {
+                final Handler handler = new Handler(context.getMainLooper());
+                final Runnable runnable = new Runnable() {
                     @Override
                     public void run() {
                         /*
-                        * Błąd w "onResult" nie anuluje pobierania
+                        * Błąd w "onResult ,onSuccess" nie anuluje pobierania
                         * */
                         try {
-                            if (!isCancelled()) requestCreator.onResult(result);
+                            if (!NetworkManager.this.isCancelled()) {
+                                requestCreator.onResult(result);
+                                requestCreator.onSuccess(result);
+                            }
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
@@ -220,7 +242,7 @@ public class NetworkManager extends AsyncTask<String, Integer, Boolean> {
                 break;
             }
 
-            if (!isCancelled()) {
+            if (!this.isCancelled()) {
                 if (i == 0) {
                     throw new Exception("RETRY == 0");
                 }
@@ -231,15 +253,19 @@ public class NetworkManager extends AsyncTask<String, Integer, Boolean> {
         }
     }
 
+    private void setCurrentRequest(RequestCreator pRequest) {
+        this.mCurrentRequest = pRequest;
+    }
+
     private InputStream onHttpConnect(String requestUrl, String params, String requestMethod,
                                       RequestHeaders requestHeaders, MultipartRequestParams multipartRequestParams) {
         InputStream inputStream;
         try {
             Log.w(TAG, "REQUEST_URL: " + requestUrl);
-            Log.w(TAG, "REQUEST_PARAMS: " + params);
+            Log.w(TAG, "REQUEST_PARAMS: " + (TextUtils.isEmpty(params) ? " " : params));
             Log.w(TAG, "REQUEST_METHOD: " + requestMethod);
 
-            HashMap<String, String> requestHeadersHeaders = requestHeaders.getHeaders();
+            final HashMap<String, String> requestHeadersHeaders = requestHeaders.getHeaders();
             for (String key : requestHeadersHeaders.keySet()) {
                 String value = requestHeadersHeaders.get(key);
                 Log.w(TAG, "REQUEST_HEADERS: " + key + ":" + value);
@@ -252,24 +278,24 @@ public class NetworkManager extends AsyncTask<String, Integer, Boolean> {
                 case RequestMethod.POST:
                 case RequestMethod.PUT:
                 case RequestMethod.DELETE:
-                    URL postUrl = new URL(requestUrl);
+                    final URL postUrl = new URL(requestUrl);
 
-                    httpURLConnection = (HttpURLConnection) postUrl.openConnection();
-                    httpURLConnection.setRequestMethod(requestMethod);
-                    httpURLConnection.setDoInput(true);
-                    httpURLConnection.setDoOutput(true);
+                    this.mHttpURLConnection = (HttpURLConnection) postUrl.openConnection();
+                    this.mHttpURLConnection.setRequestMethod(requestMethod);
+                    this.mHttpURLConnection.setDoInput(true);
+                    this.mHttpURLConnection.setDoOutput(true);
 
                     for (String key : requestHeadersHeaders.keySet()) {
                         String value = requestHeadersHeaders.get(key);
-                        httpURLConnection.setRequestProperty(key, value);
+                        this.mHttpURLConnection.setRequestProperty(key, value);
                     }
 
                     /*
                     * Default request params
                     * */
                     if (!TextUtils.isEmpty(params)) {
-                        OutputStream outputStream = httpURLConnection.getOutputStream();
-                        BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(outputStream, CHARSET));
+                        final OutputStream outputStream = this.mHttpURLConnection.getOutputStream();
+                        final BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(outputStream, CHARSET));
                         bufferedWriter.write(params);
                         bufferedWriter.flush();
                         bufferedWriter.close();
@@ -279,20 +305,18 @@ public class NetworkManager extends AsyncTask<String, Integer, Boolean> {
                     /*
                     * Multipart request params
                     * */
-                    HashMap<String, Object> multipartRequestParamsHashMap = multipartRequestParams.getFileRequestParams();
+                    final HashMap<String, Object> multipartRequestParamsHashMap = multipartRequestParams.getFileRequestParams();
                     if (multipartRequestParamsHashMap.size() > 0) {
-                        String boundary = "---------------------------" + System.currentTimeMillis();
-                        httpURLConnection.setRequestProperty("Accept-Charset", CHARSET);
-                        httpURLConnection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
-                        httpURLConnection.setUseCaches(false);
+                        final String boundary = "---------------------------" + System.currentTimeMillis();
+                        this.mHttpURLConnection.setRequestProperty("Accept-Charset", CHARSET);
+                        this.mHttpURLConnection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+                        this.mHttpURLConnection.setUseCaches(false);
 
-                        OutputStream outputStream = httpURLConnection.getOutputStream();
-                        PrintWriter printWriter = new PrintWriter(new OutputStreamWriter(outputStream, CHARSET), true);
-
-                        String CRLF = "\r\n";
+                        final OutputStream outputStream = this.mHttpURLConnection.getOutputStream();
+                        final PrintWriter printWriter = new PrintWriter(new OutputStreamWriter(outputStream, CHARSET), true);
 
                         for (String key : multipartRequestParamsHashMap.keySet()) {
-                            Object object = multipartRequestParamsHashMap.get(key);
+                            final Object object = multipartRequestParamsHashMap.get(key);
 
                             if (object instanceof String) {
                                 String value = (String) object;
@@ -332,31 +356,30 @@ public class NetworkManager extends AsyncTask<String, Integer, Boolean> {
                     }
                     break;
                 case RequestMethod.GET:
-                    URL getUrl;
+                    final URL getUrl;
                     if (TextUtils.isEmpty(params)) {
                         getUrl = new URL(requestUrl);
                     } else {
                         getUrl = new URL(requestUrl + "?" + params);
                     }
-                    httpURLConnection = (HttpURLConnection) getUrl.openConnection();
-                    httpURLConnection.setRequestMethod(RequestMethod.GET);
-
+                    this.mHttpURLConnection = (HttpURLConnection) getUrl.openConnection();
+                    this.mHttpURLConnection.setRequestMethod(RequestMethod.GET);
                     for (String key : requestHeadersHeaders.keySet()) {
-                        String value = requestHeadersHeaders.get(key);
-                        httpURLConnection.setRequestProperty(key, value);
+                        final String value = requestHeadersHeaders.get(key);
+                        this.mHttpURLConnection.setRequestProperty(key, value);
                     }
                     break;
                 default:
                     throw new Exception();
             }
 
-            int responseCode = httpURLConnection.getResponseCode();
+            final int responseCode = this.mHttpURLConnection.getResponseCode();
             Log.w(TAG, "RESPONSE_CODE: " + responseCode);
 
             if (responseCode == HttpURLConnection.HTTP_OK) {
-                inputStream = httpURLConnection.getInputStream();
+                inputStream = this.mHttpURLConnection.getInputStream();
             } else {
-                inputStream = httpURLConnection.getErrorStream();
+                inputStream = this.mHttpURLConnection.getErrorStream();
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -367,8 +390,8 @@ public class NetworkManager extends AsyncTask<String, Integer, Boolean> {
 
     @SuppressWarnings("unused")
     public String convertInputStreamToString(InputStream inputStream) throws Exception {
-        BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
-        StringBuilder stringBuilder = new StringBuilder();
+        final BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
+        final StringBuilder stringBuilder = new StringBuilder();
         String line;
         while ((line = bufferedReader.readLine()) != null) {
             stringBuilder.append(line);
@@ -379,78 +402,100 @@ public class NetworkManager extends AsyncTask<String, Integer, Boolean> {
         return stringBuilder.toString();
     }
 
-    @SuppressWarnings({"unused", "TryFinallyCanBeTryWithResources"})
+    @SuppressWarnings({"unused", "TryFinallyCanBeTryWithResources", "ResultOfMethodCallIgnored"})
     public void convertInputStreamToFile(InputStream inputStream, String filePath, String fileName) throws Exception {
-        File file = new File(filePath, fileName);
-        OutputStream outputStream = new FileOutputStream(file);
+        Log.e(TAG, "convertInputStreamToFile");
 
-        long startTimeMillis = System.currentTimeMillis();
+        final File file = new File(filePath, fileName);
+        final long startTimeMillis = System.currentTimeMillis();
 
-        try {
-            byte[] buffer = new byte[1024];
-            int read;
-            while ((read = inputStream.read(buffer)) != -1) {
-                outputStream.write(buffer, 0, read);
+        final OutputStream outputStream = new FileOutputStream(file);
+        final byte[] buffer = new byte[1024];
+
+        int bufferLength;
+        long total = 0;
+
+        final int mConnectionLength = this.mHttpURLConnection.getContentLength();
+
+        while ((bufferLength = inputStream.read(buffer)) > 0) {
+            total += bufferLength;
+            outputStream.write(buffer, 0, bufferLength);
+            this.publishProgress((int) (total * 100 / mConnectionLength), mConnectionLength);
+            if (this.isCancelled()) {
+                break;
             }
-            outputStream.flush();
-        } finally {
-            outputStream.close();
         }
 
-        long endTimeMillis = System.currentTimeMillis();
-        Log.e("Czas zapisywania pliku:", "" + (endTimeMillis - startTimeMillis) + "ms");
+        outputStream.flush();
+        outputStream.close();
+
+        if (this.isCancelled()) {
+            file.delete();
+        } else {
+            final long endTimeMillis = System.currentTimeMillis();
+            Log.e("Czas zapisywania pliku:", "" + (endTimeMillis - startTimeMillis) + "ms");
+        }
     }
 
+    @SuppressWarnings("WeakerAccess")
     public void setErrorMassage(String errorMassage) {
-        this.errorMassage = errorMassage;
+        this.mErrorMassage = errorMassage;
     }
 
     @SuppressWarnings("WeakerAccess")
     public void setDelay(int delay) {
-        this.delay = delay;
+        this.mDelay = delay;
     }
 
     @SuppressWarnings("unused")
     public void setDialog(String dialogTitle, int dialogTheme) {
-        this.showDialog = true;
-        this.dialogTitle = dialogTitle;
-        this.dialogTheme = dialogTheme;
+        this.mShowDialog = true;
+        this.mDialogTitle = dialogTitle;
+        this.mDialogTheme = dialogTheme;
     }
 
     @SuppressWarnings("unused")
     public void setNetworkManagerCallbacks(NetworkManagerCallbacks networkManagerCallbacks) {
-        this.networkManagerCallbacks = networkManagerCallbacks;
+        this.mNetworkManagerCallbacks = networkManagerCallbacks;
     }
 
     @SuppressWarnings("WeakerAccess")
     public String getErrorMassage() {
-        return this.errorMassage;
+        return this.mErrorMassage;
     }
 
+    @SuppressWarnings("WeakerAccess")
     public Context getContext() {
-        return this.contextWeakReference.get();
+        return this.mContextWeakReference.get();
     }
 
     private void onCreateProgressDialog() {
         try {
-            Context context = this.contextWeakReference.get();
+            final Context context = this.mContextWeakReference.get();
             if (context == null || context instanceof Application) {
                 return;
             }
 
-            if (!isActivityRunning()) {
+            if (!this.isActivityRunning()) {
                 return;
             }
 
-            this.progressDialog = new ProgressDialog(context, dialogTheme);
-            this.progressDialog.getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+            this.mProgressDialog = new ProgressDialog(context, mDialogTheme);
+
+            final Window mWindow = this.mProgressDialog.getWindow();
+            if (mWindow == null) {
+                return;
+            }
+
+            mWindow.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
                     | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
                     | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
                     | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
                     | WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON);
-            this.progressDialog.setMessage(dialogTitle);
-            this.progressDialog.setCanceledOnTouchOutside(false);
-            this.progressDialog.setOnKeyListener(new DialogInterface.OnKeyListener() {
+
+            this.mProgressDialog.setMessage(mDialogTitle);
+            this.mProgressDialog.setCanceledOnTouchOutside(false);
+            this.mProgressDialog.setOnKeyListener(new DialogInterface.OnKeyListener() {
                 boolean onKeyPressed = false;
 
                 @Override
@@ -463,7 +508,7 @@ public class NetworkManager extends AsyncTask<String, Integer, Boolean> {
                     return true;
                 }
             });
-            this.progressDialog.show();
+            this.mProgressDialog.show();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -471,53 +516,58 @@ public class NetworkManager extends AsyncTask<String, Integer, Boolean> {
 
     private void onDismissDialog() {
         try {
-            if (this.progressDialog != null)
-                this.progressDialog.dismiss();
+            if (this.mProgressDialog != null)
+                this.mProgressDialog.dismiss();
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    @SuppressWarnings("unused")
+    @SuppressWarnings("[unused, WeakerAccess]")
     public void cancelRequests() {
         try {
-            if (this.networkManagerCallbacks != null) {
-                this.networkManagerCallbacks.onCancelled();
+            if (this.mNetworkManagerCallbacks != null) {
+                this.mNetworkManagerCallbacks.onCancelled();
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
-        this.networkManagerCallbacks = null;
-        cancel(true);
+        this.mNetworkManagerCallbacks = null;
+        this.cancel(true);
     }
 
     @Override
     protected void onCancelled() {
         super.onCancelled();
         try {
-            if (httpURLConnection != null) {
-                httpURLConnection.disconnect();
-                httpURLConnection = null;
+            if (this.mHttpURLConnection != null) {
+                this.mHttpURLConnection.disconnect();
+                this.mHttpURLConnection = null;
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
-        onDismissDialog();
+        this.onDismissDialog();
     }
 
-    @SuppressWarnings("unused")
+    @SuppressWarnings("[unused, WeakerAccess]")
     public boolean isFinished() {
         return getStatus() == Status.FINISHED;
     }
 
+    @SuppressWarnings("WeakerAccess")
     public static boolean isInternetConnection(Context context) {
-        ConnectivityManager connectivityManager = (ConnectivityManager) context.getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
-        NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
+        final ConnectivityManager connectivityManager = (ConnectivityManager) context.getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+        final NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
         return networkInfo != null && networkInfo.isConnectedOrConnecting();
     }
 
     private boolean isActivityRunning() {
-        Context context = this.contextWeakReference.get();
-        return context != null && !((Activity) context).isFinishing();
+        final Context context = this.mContextWeakReference.get();
+        if (Build.VERSION.SDK_INT >= 17) {
+            return context != null && !((Activity) context).isFinishing() && !((Activity) context).isDestroyed();
+        } else {
+            return context != null && !((Activity) context).isFinishing();
+        }
     }
 }
