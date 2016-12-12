@@ -9,7 +9,7 @@ public abstract class RequestCreator<T> {
 
     private WeakReference<RequestCallback<T>> mRequestCallbackReference;
 
-    private NetworkManager mNetworkManager;
+    private BackgroundTask mBackgroundTask;
 
     public abstract String onCreateUrl();
 
@@ -27,18 +27,18 @@ public abstract class RequestCreator<T> {
 
     public abstract void onResult(T result) throws Exception;
 
-    public void setNetworkManager(NetworkManager networkManager) {
-        this.mNetworkManager = networkManager;
+    void setBackgroundTask(BackgroundTask networkManager) {
+        this.mBackgroundTask = networkManager;
     }
 
     @SuppressWarnings("unused")
     public void setErrorMessage(String errorMessage) {
-        this.mNetworkManager.setErrorMassage(errorMessage);
+        this.mBackgroundTask.setErrorMassage(errorMessage);
     }
 
     @SuppressWarnings("unused")
-    public NetworkManager getNetworkManager() {
-        return this.mNetworkManager;
+    protected BackgroundTask getNetworkManager() {
+        return this.mBackgroundTask;
     }
 
     @SuppressWarnings("unused")
@@ -51,7 +51,7 @@ public abstract class RequestCreator<T> {
         this.mRequestCallbackReference = new WeakReference<>(pRequestCallback);
     }
 
-    public void onSuccess(T result) throws Exception {
+    void onSuccess(T result) throws Exception {
         if (this.mRequestCallbackReference != null) {
             final RequestCallback<T> mRequestCallback = this.mRequestCallbackReference.get();
             if (mRequestCallback != null) {
@@ -60,7 +60,7 @@ public abstract class RequestCreator<T> {
         }
     }
 
-    public void onError(String error) throws Exception {
+    void onError(String error) throws Exception {
         if (this.mRequestCallbackReference != null) {
             final RequestCallback<T> mRequestCallback = this.mRequestCallbackReference.get();
             if (mRequestCallback != null) {

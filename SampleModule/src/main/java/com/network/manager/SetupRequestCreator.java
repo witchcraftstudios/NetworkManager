@@ -11,9 +11,9 @@ import com.network.library.RequestParams;
 import java.io.File;
 import java.io.InputStream;
 
-import static com.network.manager.TestActivity.TAG;
-
 public class SetupRequestCreator extends RequestCreator<InitModel> {
+
+    private static final String TAG = "SetupRequestCreator";
 
     @Override
     public String onCreateUrl() {

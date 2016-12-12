@@ -12,6 +12,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 
+import com.network.library.BackgroundTask;
 import com.network.library.NetworkManager;
 import com.network.library.NetworkManagerCallbacks;
 import com.network.library.RequestCallback;
@@ -28,15 +29,16 @@ public class MainActivity extends AppCompatActivity {
 
     public void onStartClick(View view) {
         if (onCheckPermissions()) {
-            NetworkManager mNetworkManager = new NetworkManager(MainActivity.this, true);
-            mNetworkManager.init("Błąd połączenia...", 1000);
+            final NetworkManager mNetworkManager = NetworkManager.getInstance(getApplication());
+            final BackgroundTask mBackgroundTask = mNetworkManager.createBackgroundTask(this, true);
+            mBackgroundTask.init("Błąd połączenia...", 1000);
 
             SetupRequestCreator mSetupRequestCreator = new SetupRequestCreator();
             mSetupRequestCreator.setRequestCallback(this.mRequestCallback);
 
-            mNetworkManager.addRequest(mSetupRequestCreator);
-            mNetworkManager.setNetworkManagerCallbacks(this.mNetworkManagerCallbacks);
-            mNetworkManager.execute();
+            mBackgroundTask.addRequest(mSetupRequestCreator);
+            mBackgroundTask.setNetworkManagerCallbacks(this.mNetworkManagerCallbacks);
+            mBackgroundTask.execute();
         }
     }
 
@@ -56,7 +58,6 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE);
             return false;
         }
-
         return true;
     }
 
