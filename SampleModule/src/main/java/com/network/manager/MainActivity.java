@@ -15,7 +15,6 @@ import android.view.View;
 import com.network.library.BackgroundTask;
 import com.network.library.NetworkManager;
 import com.network.library.NetworkManagerCallbacks;
-import com.network.library.RequestCallback;
 
 public class MainActivity extends AppCompatActivity {
     public static final int PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE = 1;
@@ -34,7 +33,6 @@ public class MainActivity extends AppCompatActivity {
             mBackgroundTask.init("Błąd połączenia...", 1000);
 
             SetupRequestCreator mSetupRequestCreator = new SetupRequestCreator();
-            mSetupRequestCreator.setRequestCallback(this.mRequestCallback);
 
             mBackgroundTask.addRequest(mSetupRequestCreator);
             mBackgroundTask.setNetworkManagerCallbacks(this.mNetworkManagerCallbacks);
@@ -73,21 +71,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     }
-
-
-    private final RequestCallback<InitModel> mRequestCallback = new RequestCallback<InitModel>() {
-
-        @Override
-        public void onSuccess(InitModel pResult) throws Exception {
-            Log.e(TAG, "RequestCallback: " + "onSuccess");
-        }
-
-        @Override
-        public void onError(String pError) {
-            Log.e(TAG, "RequestCallback: " + "onError: " + pError);
-        }
-    };
-
 
     private final NetworkManagerCallbacks mNetworkManagerCallbacks = new NetworkManagerCallbacks() {
         @Override

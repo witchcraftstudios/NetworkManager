@@ -7,8 +7,6 @@ import java.lang.ref.WeakReference;
 
 public abstract class RequestCreator<T> {
 
-    private WeakReference<RequestCallback<T>> mRequestCallbackReference;
-
     private BackgroundTask mBackgroundTask;
 
     public abstract String onCreateUrl();
@@ -44,28 +42,5 @@ public abstract class RequestCreator<T> {
     @SuppressWarnings("unused")
     public Context getContext() {
         return getNetworkManager().getContext();
-    }
-
-    @SuppressWarnings({"unused", "unchecked"})
-    public void setRequestCallback(RequestCallback<T> pRequestCallback) {
-        this.mRequestCallbackReference = new WeakReference<>(pRequestCallback);
-    }
-
-    void onSuccess(T result) throws Exception {
-        if (this.mRequestCallbackReference != null) {
-            final RequestCallback<T> mRequestCallback = this.mRequestCallbackReference.get();
-            if (mRequestCallback != null) {
-                mRequestCallback.onSuccess(result);
-            }
-        }
-    }
-
-    void onError(String error) throws Exception {
-        if (this.mRequestCallbackReference != null) {
-            final RequestCallback<T> mRequestCallback = this.mRequestCallbackReference.get();
-            if (mRequestCallback != null) {
-                mRequestCallback.onError(error);
-            }
-        }
     }
 }

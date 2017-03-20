@@ -51,7 +51,7 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
     private ProgressDialog mProgressDialog;
     private RequestCreator mCurrentRequest;
 
-    private String mErrorMassage = "Connection error...";
+    private String mErrorMassage = "";
     private String mDialogTitle;
 
     private int mDialogTheme = ProgressDialog.STYLE_SPINNER;
@@ -158,7 +158,7 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
 
     @SuppressWarnings({"EmptyMethod", "UnusedParameters", "WeakerAccess"})
     protected void onUpdateProgress(int progress, int size, String simpleName) {
-        Log.e(simpleName, "onUpdateProgress: " + progress + "/" + size);
+        //Log.e(simpleName, "onUpdateProgress: " + progress + "/" + size);
     }
 
     @Override
@@ -181,10 +181,6 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
             } else {
                 if (this.mNetworkManagerCallbacks != null) {
                     this.mNetworkManagerCallbacks.onError(this.getErrorMassage());
-                }
-
-                if (this.mCurrentRequest != null) {
-                    this.mCurrentRequest.onError(this.getErrorMassage());
                 }
             }
         } catch (Exception e) {
@@ -249,7 +245,6 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
                         try {
                             if (!BackgroundTask.this.isCancelled()) {
                                 requestCreator.onResult(result);
-                                requestCreator.onSuccess(result);
                             }
                         } catch (Exception e) {
                             e.printStackTrace();
@@ -393,7 +388,8 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
 
             if (responseCode == HttpURLConnection.HTTP_OK
                     || responseCode == HttpURLConnection.HTTP_CREATED
-                    || responseCode == HttpURLConnection.HTTP_ACCEPTED) {
+                    || responseCode == HttpURLConnection.HTTP_ACCEPTED
+                    || responseCode == 204) {
 
                 inputStream = this.mHttpURLConnection.getInputStream();
             } else {
@@ -553,7 +549,16 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
 
     private void onDismissDialog() {
         try {
-            if (this.mProgressDialog != null)
+            final Context context = this.mContextWeakReference.get();
+            if (context == null) {
+                return;
+            }
+
+            if (!this.isActivityRunning()) {
+                return;
+            }
+
+            if (this.mProgressDialog != null && this.mProgressDialog.isShowing())
                 this.mProgressDialog.dismiss();
         } catch (Exception e) {
             e.printStackTrace();
