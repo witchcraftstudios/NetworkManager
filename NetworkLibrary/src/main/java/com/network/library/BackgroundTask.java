@@ -15,6 +15,12 @@ import android.view.KeyEvent;
 import android.view.Window;
 import android.view.WindowManager;
 
+import com.network.library.exceptions.CustomException;
+import com.network.library.exceptions.InternetConnectionException;
+import com.network.library.exceptions.NullContextException;
+import com.network.library.exceptions.NullCreatorException;
+import com.network.library.exceptions.ParseException;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -38,7 +44,7 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
     private static final String CHARSET = "UTF-8";
     private static final String CRLF = "\r\n";
 
-    private final List<RequestCreator> requestCreatorList = new ArrayList<>();
+    private final List<RequestCreator> mRequestCreatorList = new ArrayList<>();
     private final List<BackgroundTask> mBackgroundTaskList;
 
 
@@ -51,7 +57,12 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
     private ProgressDialog mProgressDialog;
     private RequestCreator mCurrentRequest;
 
+    private String mNoInternetConnectionErrorMessage = "No internet connection...";
+    private String mDefaultErrorMessage = "Internal exception...";
+    private String mParseErrorMessage = "Parse exception...";
+
     private String mErrorMassage = "";
+
     private String mDialogTitle;
 
     private int mDialogTheme = ProgressDialog.STYLE_SPINNER;
@@ -68,8 +79,11 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
     }
 
     @SuppressWarnings("unused")
-    public void init(String defaultErrorMessage, int delay) {
-        this.setErrorMassage(defaultErrorMessage);
+    public void init(String defaultErrorMessage, String parseErrorMessage,
+                     String noInternetConnectionError, int delay) {
+        this.mNoInternetConnectionErrorMessage = noInternetConnectionError;
+        this.mDefaultErrorMessage = defaultErrorMessage;
+        this.mParseErrorMessage = parseErrorMessage;
         this.setDelay(delay);
     }
 
@@ -96,24 +110,22 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
     protected Boolean doInBackground(String... params) {
         try {
             Thread.sleep(this.mDelay);
-            if (this.requestCreatorList.size() < 1) {
-                Log.e(TAG, "You must have at least one \"RequestCreator\"");
-                return false;
+            if (this.mRequestCreatorList.size() < 1) {
+                throw new NullCreatorException();
             }
 
-            for (int i = 0; i < this.requestCreatorList.size(); i++) {
+            for (int i = 0; i < this.mRequestCreatorList.size(); i++) {
                 if (this.isCancelled()) {
                     return false;
                 }
 
                 final Context context = this.mContextWeakReference.get();
                 if (context == null) {
-                    Log.w(TAG, "doInBackground: context == null");
-                    return false;
+                    throw new NullContextException();
                 }
 
                 if (!NetworkManager.isInternetConnection(context)) {
-                    throw new Exception();
+                    throw new InternetConnectionException();
                 }
 
                 /*
@@ -125,12 +137,34 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
                     }
                 }
 
-                final RequestCreator requestCreator = this.requestCreatorList.get(i);
+                final RequestCreator requestCreator = this.mRequestCreatorList.get(i);
                 this.onCreateRequest(requestCreator);
                 this.publishProgress(i + 1);
             }
             return true;
+        } catch (InternetConnectionException e) {
+            Log.e(TAG, "InternetConnectionException");
+            setErrorMassage(this.mNoInternetConnectionErrorMessage);
+            e.printStackTrace();
+        } catch (NullCreatorException e) {
+            Log.e(TAG, "NoRequestCreatorException");
+            setErrorMassage(this.mDefaultErrorMessage);
+            e.printStackTrace();
+        } catch (NullContextException e) {
+            Log.e(TAG, "NullContextException");
+            setErrorMassage(this.mDefaultErrorMessage);
+            e.printStackTrace();
+        } catch (ParseException e) {
+            setErrorMassage(TextUtils.isEmpty(this.mParseErrorMessage) ? e.getMessage() : this.mParseErrorMessage);
+            Log.e(TAG, "ParseException");
+            e.printStackTrace();
+        } catch (CustomException e) {
+            setErrorMassage(e.getMessage());
+            Log.e(TAG, "CustomException");
+            e.printStackTrace();
         } catch (Exception e) {
+            setErrorMassage(this.mDefaultErrorMessage);
+            Log.e(TAG, "Exception");
             e.printStackTrace();
         } finally {
             Log.e(TAG, "Finally: disconnect()");
@@ -149,9 +183,9 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
             if (this.mCurrentRequest != null)
                 this.onUpdateProgress(values[0], 100, this.mCurrentRequest.getClass().getSimpleName());
         } else {
-            this.onUpdateProgress(values[0], this.requestCreatorList.size(), TAG);
+            this.onUpdateProgress(values[0], this.mRequestCreatorList.size(), TAG);
             if (this.mUpdateListener != null) {
-                this.mUpdateListener.onUpdate(values[0], this.requestCreatorList.size());
+                this.mUpdateListener.onUpdate(values[0], this.mRequestCreatorList.size());
             }
         }
     }
@@ -190,7 +224,7 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
 
     @SuppressWarnings("unused")
     public void addRequest(RequestCreator requestCreator) {
-        this.requestCreatorList.add(requestCreator);
+        this.mRequestCreatorList.add(requestCreator);
     }
 
     @SuppressWarnings("unchecked")
@@ -389,7 +423,7 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
             if (responseCode == HttpURLConnection.HTTP_OK
                     || responseCode == HttpURLConnection.HTTP_CREATED
                     || responseCode == HttpURLConnection.HTTP_ACCEPTED
-                    || responseCode == 204) {
+                    || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
 
                 inputStream = this.mHttpURLConnection.getInputStream();
             } else {
@@ -406,11 +440,11 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
     public String convertInputStreamToString(InputStream inputStream) throws Exception {
         final BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
         final StringBuilder stringBuilder = new StringBuilder();
-                String line;
-                while ((line = bufferedReader.readLine()) != null) {
-                    stringBuilder.append(line);
-                    if (isCancelled()) {
-                        break;
+        String line;
+        while ((line = bufferedReader.readLine()) != null) {
+            stringBuilder.append(line);
+            if (isCancelled()) {
+                break;
             }
         }
         return stringBuilder.toString();
