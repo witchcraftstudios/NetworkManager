@@ -406,11 +406,11 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
     public String convertInputStreamToString(InputStream inputStream) throws Exception {
         final BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
         final StringBuilder stringBuilder = new StringBuilder();
-        String line;
-        while ((line = bufferedReader.readLine()) != null) {
-            stringBuilder.append(line);
-            if (isCancelled()) {
-                break;
+                String line;
+                while ((line = bufferedReader.readLine()) != null) {
+                    stringBuilder.append(line);
+                    if (isCancelled()) {
+                        break;
             }
         }
         return stringBuilder.toString();
