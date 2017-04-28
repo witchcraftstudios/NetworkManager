@@ -21,7 +21,8 @@ public class MainActivity extends AppCompatActivity {
     public void onStartClick(View view) {
         final NetworkManager mNetworkManager = NetworkManager.getInstance(getApplication());
         final BackgroundTask mBackgroundTask = mNetworkManager.createBackgroundTask(this, true);
-        mBackgroundTask.init("Bład połączenia...", "Błąd pobierania danych..", "Brak dostępu do internetu...", 1000);
+        mBackgroundTask.init("Błąd podczas połączenia...", "Błąd pobierania danych..",
+                "Brak dostępu do internetu...","Bład połączenia...", 1000);
         mBackgroundTask.addRequest(new LoginRequest());
         mBackgroundTask.setNetworkManagerCallbacks(this.mNetworkManagerCallbacks);
         mBackgroundTask.execute();

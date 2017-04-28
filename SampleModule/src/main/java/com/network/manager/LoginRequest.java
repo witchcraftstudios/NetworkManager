@@ -8,7 +8,6 @@ import com.network.library.RequestHeaders;
 import com.network.library.RequestMethod;
 import com.network.library.RequestParams;
 import com.network.library.exceptions.CustomException;
-import com.network.library.exceptions.ParseException;
 
 import org.json.JSONObject;
 
@@ -53,16 +52,13 @@ public class LoginRequest extends RequestCreator {
     public Object onDownloadSuccess(InputStream inputStream) throws Exception {
         final String response = getNetworkManager().convertInputStreamToString(inputStream);
         Log.e(TAG, "onDownloadSuccess: " + response);
-        try {
-            final JSONObject responseObject = new JSONObject(response);
-            final JSONObject replyObject = responseObject.getJSONObject("reply");
-            if (replyObject.has("error")) {
-                JSONObject errorObject = replyObject.getJSONObject("error");
-                throw new CustomException(errorObject.getString("description"));
-            }
-        } catch (ParseException e) {
-            e.printStackTrace();
+        final JSONObject responseObject = new JSONObject(response);
+        final JSONObject replyObject = responseObject.getJSONObject("reply");
+        if (replyObject.has("error")) {
+            JSONObject errorObject = replyObject.getJSONObject("error");
+            throw new CustomException(errorObject.getString("description"));
         }
+
         return null;
     }
 

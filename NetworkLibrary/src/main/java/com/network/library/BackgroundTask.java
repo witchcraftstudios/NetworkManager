@@ -15,11 +15,13 @@ import android.view.KeyEvent;
 import android.view.Window;
 import android.view.WindowManager;
 
+import com.network.library.exceptions.ConnectionException;
 import com.network.library.exceptions.CustomException;
 import com.network.library.exceptions.InternetConnectionException;
 import com.network.library.exceptions.NullContextException;
 import com.network.library.exceptions.NullCreatorException;
-import com.network.library.exceptions.ParseException;
+
+import org.json.JSONException;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -60,6 +62,7 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
     private String mNoInternetConnectionErrorMessage = "No internet connection...";
     private String mDefaultErrorMessage = "Internal exception...";
     private String mParseErrorMessage = "Parse exception...";
+    private String mConnectionError = "Connection error...";
 
     private String mErrorMassage = "";
 
@@ -80,9 +83,11 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
 
     @SuppressWarnings("unused")
     public void init(String defaultErrorMessage, String parseErrorMessage,
-                     String noInternetConnectionError, int delay) {
+                     String noInternetConnectionError, String connectionError,
+                     int delay) {
         this.mNoInternetConnectionErrorMessage = noInternetConnectionError;
         this.mDefaultErrorMessage = defaultErrorMessage;
+        this.mConnectionError = connectionError;
         this.mParseErrorMessage = parseErrorMessage;
         this.setDelay(delay);
     }
@@ -154,13 +159,17 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
             Log.e(TAG, "NullContextException");
             setErrorMassage(this.mDefaultErrorMessage);
             e.printStackTrace();
-        } catch (ParseException e) {
+        } catch (JSONException e) {
             setErrorMassage(TextUtils.isEmpty(this.mParseErrorMessage) ? e.getMessage() : this.mParseErrorMessage);
-            Log.e(TAG, "ParseException");
+            Log.e(TAG, "JSONException");
             e.printStackTrace();
         } catch (CustomException e) {
             setErrorMassage(e.getMessage());
             Log.e(TAG, "CustomException");
+            e.printStackTrace();
+        } catch (ConnectionException e) {
+            setErrorMassage(this.mConnectionError);
+            Log.e(TAG, "ConnectionException");
             e.printStackTrace();
         } catch (Exception e) {
             setErrorMassage(this.mDefaultErrorMessage);
@@ -243,13 +252,12 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
         final String requestUrl = requestCreator.onCreateUrl();
         final HashMap<String, String> urlParams = requestParams.getUrlParams();
 
-        final Uri.Builder uriBuilder = new Uri.Builder();
+        final Uri.Builder uriParamsBuilder = new Uri.Builder();
         for (String key : urlParams.keySet()) {
             String value = urlParams.get(key);
-            uriBuilder.appendQueryParameter(key, value);
+            uriParamsBuilder.appendQueryParameter(key, value);
         }
 
-        final String params = uriBuilder.build().getEncodedQuery();
         final RequestHeaders requestHeaders = new RequestHeaders();
         requestCreator.onCreateRequestHeaders(requestHeaders);
 
@@ -261,7 +269,7 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
                 break;
             }
 
-            final InputStream inputStream = onHttpConnect(requestUrl, params, requestMethod, requestHeaders, multipartRequestParams);
+            final InputStream inputStream = onHttpConnect(requestUrl, uriParamsBuilder, requestMethod, requestHeaders, multipartRequestParams);
             if (inputStream != null) {
                 final Context context = this.mContextWeakReference.get();
                 if (context == null) {
@@ -274,7 +282,7 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
                     @Override
                     public void run() {
                         /*
-                        * Błąd w "onResult ,onSuccess" nie anuluje pobierania
+                        * Błąd w "onResult" nie anuluje pobierania
                         * */
                         try {
                             if (!BackgroundTask.this.isCancelled()) {
@@ -292,7 +300,7 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
 
             if (!this.isCancelled()) {
                 if (i == 0) {
-                    throw new Exception("RETRY == 0");
+                    throw new ConnectionException("");
                 }
 
                 Log.e(TAG, "******RETRY COUNT: " + (i - 1) + "*******");
@@ -301,12 +309,15 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
         }
     }
 
-    private InputStream onHttpConnect(String requestUrl, String params, String requestMethod,
+    private InputStream onHttpConnect(String requestUrl, Uri.Builder uriParamsBuilder, String requestMethod,
                                       RequestHeaders requestHeaders, MultipartRequestParams multipartRequestParams) {
         InputStream inputStream;
         try {
+            final Uri uriParams = uriParamsBuilder.build();
+            final String params = uriParams.getEncodedQuery();
+
+            Log.w(TAG, "REQUEST_PARAMS: " + uriParams.toString());
             Log.w(TAG, "REQUEST_URL: " + requestUrl);
-            Log.w(TAG, "REQUEST_PARAMS: " + (TextUtils.isEmpty(params) ? " " : params));
             Log.w(TAG, "REQUEST_METHOD: " + requestMethod);
 
             final HashMap<String, String> requestHeadersHeaders = requestHeaders.getHeaders();
