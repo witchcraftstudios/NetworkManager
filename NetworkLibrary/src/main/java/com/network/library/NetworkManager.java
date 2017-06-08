@@ -5,7 +5,6 @@ import android.app.Application;
 import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
-import android.util.Log;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,7 +36,7 @@ public class NetworkManager {
     public BackgroundTask createBackgroundTask(Context pContext, boolean pCancelOnDestroy) {
         final BackgroundTask mBackgroundTask = new BackgroundTask(this.mBackgroundTaskList, pContext, pCancelOnDestroy);
         this.mBackgroundTaskList.add(mBackgroundTask);
-        Log.e(TAG, "BackgroundTaskCount: " + mBackgroundTaskList.size());
+        NetworkManagerDebug.logE(TAG, "BackgroundTaskCount: " + mBackgroundTaskList.size());
         return mBackgroundTask;
     }
 
@@ -45,7 +44,7 @@ public class NetworkManager {
     private final ActivityLifecycleListener mActivityLifecycleListener = new ActivityLifecycleListener() {
         @Override
         public void onActivityDestroyed(Activity activity) {
-            Log.e(TAG, "onActivityDestroyed: " + activity.getClass().getName());
+            NetworkManagerDebug.logE(TAG, "onActivityDestroyed: " + activity.getClass().getName());
             for (final BackgroundTask backgroundTask : mBackgroundTaskList) {
                 if (backgroundTask.getContext() == null) {
                     continue;

@@ -16,7 +16,6 @@ import java.io.InputStream;
 public class LoginRequest extends RequestCreator {
     private static final String TAG = "LoginRequest";
 
-
     @Override
     public String onCreateUrl() {
         return "http://ovbsalesbook.dev.wcstd.net/api/Login.json";
@@ -50,7 +49,7 @@ public class LoginRequest extends RequestCreator {
 
     @Override
     public Object onDownloadSuccess(InputStream inputStream) throws Exception {
-        final String response = getNetworkManager().convertInputStreamToString(inputStream);
+        final String response = getBackgroundTask().convertInputStreamToString(inputStream);
         Log.e(TAG, "onDownloadSuccess: " + response);
         final JSONObject responseObject = new JSONObject(response);
         final JSONObject replyObject = responseObject.getJSONObject("reply");
@@ -58,7 +57,6 @@ public class LoginRequest extends RequestCreator {
             JSONObject errorObject = replyObject.getJSONObject("error");
             throw new CustomException(errorObject.getString("description"));
         }
-
         return null;
     }
 

@@ -10,7 +10,6 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Handler;
 import android.text.TextUtils;
-import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Window;
 import android.view.WindowManager;
@@ -148,35 +147,35 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
             }
             return true;
         } catch (InternetConnectionException e) {
-            Log.e(TAG, "InternetConnectionException");
-            setErrorMassage(this.mNoInternetConnectionErrorMessage);
+            NetworkManagerDebug.logE(TAG, "InternetConnectionException");
+            this.setErrorMassage(this.mNoInternetConnectionErrorMessage);
             e.printStackTrace();
         } catch (NullCreatorException e) {
-            Log.e(TAG, "NoRequestCreatorException");
-            setErrorMassage(this.mDefaultErrorMessage);
+            NetworkManagerDebug.logE(TAG, "NoRequestCreatorException");
+            this.setErrorMassage(this.mDefaultErrorMessage);
             e.printStackTrace();
         } catch (NullContextException e) {
-            Log.e(TAG, "NullContextException");
-            setErrorMassage(this.mDefaultErrorMessage);
+            NetworkManagerDebug.logE(TAG, "NullContextException");
+            this.setErrorMassage(this.mDefaultErrorMessage);
             e.printStackTrace();
         } catch (JSONException e) {
-            setErrorMassage(TextUtils.isEmpty(this.mParseErrorMessage) ? e.getMessage() : this.mParseErrorMessage);
-            Log.e(TAG, "JSONException");
+            this.setErrorMassage(TextUtils.isEmpty(this.mParseErrorMessage) ? e.getMessage() : this.mParseErrorMessage);
+            NetworkManagerDebug.logE(TAG, "JSONException");
             e.printStackTrace();
         } catch (CustomException e) {
-            setErrorMassage(e.getMessage());
-            Log.e(TAG, "CustomException");
+            this.setErrorMassage(e.getMessage());
+            NetworkManagerDebug.logE(TAG, "CustomException");
             e.printStackTrace();
         } catch (ConnectionException e) {
-            setErrorMassage(this.mConnectionError);
-            Log.e(TAG, "ConnectionException");
+            this.setErrorMassage(this.mConnectionError);
+            NetworkManagerDebug.logE(TAG, "ConnectionException");
             e.printStackTrace();
         } catch (Exception e) {
-            setErrorMassage(this.mDefaultErrorMessage);
-            Log.e(TAG, "Exception");
+            this.setErrorMassage(this.mDefaultErrorMessage);
+            NetworkManagerDebug.logE(TAG, "Exception");
             e.printStackTrace();
         } finally {
-            Log.e(TAG, "Finally: disconnect()");
+            NetworkManagerDebug.logE(TAG, "Finally: disconnect()");
             if (this.mHttpURLConnection != null) {
                 this.mHttpURLConnection.disconnect();
                 this.mHttpURLConnection = null;
@@ -201,7 +200,7 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
 
     @SuppressWarnings({"EmptyMethod", "UnusedParameters", "WeakerAccess"})
     protected void onUpdateProgress(int progress, int size, String simpleName) {
-        //Log.e(simpleName, "onUpdateProgress: " + progress + "/" + size);
+        //NetworkManagerDebug.logE(simpleName, "onUpdateProgress: " + progress + "/" + size);
     }
 
     @Override
@@ -303,7 +302,7 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
                     throw new ConnectionException("");
                 }
 
-                Log.e(TAG, "******RETRY COUNT: " + (i - 1) + "*******");
+                NetworkManagerDebug.logE(TAG, "******RETRY COUNT: " + (i - 1) + "*******");
                 Thread.sleep(1000);
             }
         }
@@ -316,14 +315,14 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
             final Uri uriParams = uriParamsBuilder.build();
             final String params = uriParams.getEncodedQuery();
 
-            Log.w(TAG, "REQUEST_PARAMS: " + uriParams.toString());
-            Log.w(TAG, "REQUEST_URL: " + requestUrl);
-            Log.w(TAG, "REQUEST_METHOD: " + requestMethod);
+            NetworkManagerDebug.logE(TAG, "REQUEST_PARAMS: " + uriParams.toString());
+            NetworkManagerDebug.logE(TAG, "REQUEST_URL: " + requestUrl);
+            NetworkManagerDebug.logE(TAG, "REQUEST_METHOD: " + requestMethod);
 
             final HashMap<String, String> requestHeadersHeaders = requestHeaders.getHeaders();
             for (String key : requestHeadersHeaders.keySet()) {
                 String value = requestHeadersHeaders.get(key);
-                Log.w(TAG, "REQUEST_HEADERS: " + key + ":" + value);
+                NetworkManagerDebug.logE(TAG, "REQUEST_HEADERS: " + key + ":" + value);
             }
 
             if (!TextUtils.isEmpty(params) && multipartRequestParams.getFileRequestParams().size() > 0)
@@ -429,7 +428,7 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
             }
 
             final int responseCode = this.mHttpURLConnection.getResponseCode();
-            Log.w(TAG, "RESPONSE_CODE: " + responseCode);
+            NetworkManagerDebug.logE(TAG, "RESPONSE_CODE: " + responseCode);
 
             if (responseCode == HttpURLConnection.HTTP_OK
                     || responseCode == HttpURLConnection.HTTP_CREATED
@@ -463,7 +462,7 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
 
     @SuppressWarnings({"unused", "TryFinallyCanBeTryWithResources", "ResultOfMethodCallIgnored"})
     public void convertInputStreamToFile(InputStream inputStream, String filePath, String fileName) throws Exception {
-        Log.e(TAG, "convertInputStreamToFile");
+        NetworkManagerDebug.logE(TAG, "convertInputStreamToFile");
 
         final File file = new File(filePath, fileName);
         final long startTimeMillis = System.currentTimeMillis();
@@ -492,7 +491,7 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
             file.delete();
         } else {
             final long endTimeMillis = System.currentTimeMillis();
-            Log.e("Czas zapisywania pliku:", "" + (endTimeMillis - startTimeMillis) + "ms");
+            NetworkManagerDebug.logE("Czas zapisywania pliku:", "" + (endTimeMillis - startTimeMillis) + "ms");
         }
     }
 
@@ -500,8 +499,7 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
         this.mCurrentRequest = pRequest;
     }
 
-    @SuppressWarnings("WeakerAccess")
-    public void setErrorMassage(String errorMassage) {
+    private void setErrorMassage(String errorMassage) {
         this.mErrorMassage = errorMassage;
     }
 
@@ -630,7 +628,7 @@ public class BackgroundTask extends AsyncTask<String, Integer, Boolean> {
         this.onDismissDialog();
 
         if (this.mHttpURLConnection != null) {
-            Log.e(TAG, "onCancelled: " + "Force disconnect");
+            NetworkManagerDebug.logE(TAG, "onCancelled: " + "Force disconnect");
             this.mHttpURLConnection.disconnect();
             this.mHttpURLConnection = null;
         }

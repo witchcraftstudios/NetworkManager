@@ -3,7 +3,6 @@ package com.network.library;
 import android.content.Context;
 
 import java.io.InputStream;
-import java.lang.ref.WeakReference;
 
 public abstract class RequestCreator<T> {
 
@@ -25,22 +24,17 @@ public abstract class RequestCreator<T> {
 
     public abstract void onResult(T result) throws Exception;
 
-    void setBackgroundTask(BackgroundTask networkManager) {
-        this.mBackgroundTask = networkManager;
+    void setBackgroundTask(BackgroundTask mBackgroundTask) {
+        this.mBackgroundTask = mBackgroundTask;
     }
 
     @SuppressWarnings("unused")
-    public void setErrorMessage(String errorMessage) {
-        this.mBackgroundTask.setErrorMassage(errorMessage);
-    }
-
-    @SuppressWarnings("unused")
-    protected BackgroundTask getNetworkManager() {
+    protected BackgroundTask getBackgroundTask() {
         return this.mBackgroundTask;
     }
 
     @SuppressWarnings("unused")
     public Context getContext() {
-        return getNetworkManager().getContext();
+        return this.mBackgroundTask.getContext();
     }
 }
